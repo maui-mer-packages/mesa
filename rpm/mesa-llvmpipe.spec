@@ -6,31 +6,33 @@
 Name:       mesa-llvmpipe
 
 # >> macros
+# Conditional building of X11 related things
+%bcond_without X11
 # << macros
 
 Summary:    Mesa graphics libraries built for LLVMpipe
-Version:    9.0.3
-Release:    0
+Version:    10.0.4
+Release:    1
 Group:      System/Libraries
 License:    MIT
 URL:        http://www.mesa3d.org/
-Source0:    ftp://ftp.freedesktop.org/pub/mesa/%{version}/MesaLib-%{version}.tar.bz2
+Source0:    %{name}-%{version}.tar.bz2
 Source1:    mesa-llvmpipe-rpmlintrc
-Source100:  mesa-llvmpipe.yaml
-Patch0:     mesa-7.11-git-notimestamping.patch
-Patch1:     fix-shm-roundtrip.patch
-Patch2:     nosse4avx.patch
-Patch3:     nativewidth.patch
+Patch0:     eglplatform_no_x11.patch
+
+%if %{with X11}
 BuildRequires:  pkgconfig(glproto)
 BuildRequires:  pkgconfig(dri2proto) >= 1.1
 BuildRequires:  pkgconfig(xproto)
-BuildRequires:  pkgconfig(libdrm)
 BuildRequires:  pkgconfig(xxf86vm)
 BuildRequires:  pkgconfig(xext)
 BuildRequires:  pkgconfig(xfixes)
 BuildRequires:  pkgconfig(xdamage)
 BuildRequires:  pkgconfig(xi)
 BuildRequires:  pkgconfig(xmu)
+BuildRequires:  makedepend
+%endif
+BuildRequires:  pkgconfig(libdrm)
 BuildRequires:  pkgconfig(libxml-2.0)
 BuildRequires:  pkgconfig(talloc)
 BuildRequires:  pkgconfig(libudev) >= 160
@@ -42,8 +44,8 @@ BuildRequires:  python
 BuildRequires:  libxml2-python
 BuildRequires:  bison
 BuildRequires:  flex
-BuildRequires:  makedepend
 BuildRequires:  llvm-devel
+BuildRequires:  gettext
 
 %description
 Mesa is an open-source implementation of the OpenGL specification  -
@@ -93,6 +95,16 @@ Provides:   libGLESv2.so
 
 %description libGLESv2-compat
 Mesa libGLESv2 runtime compatibility library.
+
+%package libGLES3-devel
+Summary:    Mesa libGLES3 development package
+Group:      Development/Libraries
+Requires:   %{name} = %{version}-%{release}
+Requires:   mesa-llvmpipe-libGLES3 = %{version}-%{release}
+Provides:   libGLES3-devel
+
+%description libGLES3-devel
+Mesa libGLES3 development packages
 
 %package libEGL
 Summary:    Mesa libEGL runtime libraries and DRI drivers
@@ -159,23 +171,25 @@ Obsoletes:   mesa-llvmpipe-libEGL-compat
 %description libEGL-devel
 Mesa libEGL development packages
 
+%if %{with X11}
 %package libGL
 Summary:    Mesa libGL runtime libraries and DRI drivers
 Group:      System/Libraries
 Requires:   %{name} = %{version}-%{release}
-Requires(post): /sbin/ldconfig
-Requires(postun): /sbin/ldconfig
 Provides:   libGL = %{version}-%{release}
 
 %description libGL
 Mesa libGL runtime library.
+%endif
 
 %package libGL-devel
 Summary:    Mesa libGL development package
 Group:      Development/Libraries
 Requires:   %{name} = %{version}-%{release}
 Requires:   mesa-llvmpipe-libGL = %{version}-%{release}
+%if %{with X11}
 Requires:   libX11-devel
+%endif
 Provides:   libGL-devel
 
 %description libGL-devel
@@ -220,71 +234,78 @@ Requires(postun): /sbin/ldconfig
 %description libwayland-egl
 Mesa libwayland-egl runtime libraries
 
+%package libgbm-devel
+Summary:    Mesa libgbm development package
+Group:      Development/Libraries
+Requires:   %{name} = %{version}-%{release}
+Requires:   mesa-llvmpipe-libgbm = %{version}-%{release}
+Provides:   libgbm-devel
+
+%description libgbm-devel
+libgbm development packages
+
+%package libgbm
+Summary:    Mesa libgbm runtime library
+Group:      System/Libraries
+Requires:   %{name} = %{version}-%{release}
+Requires(post): /sbin/ldconfig
+Requires(postun): /sbin/ldconfig
+Provides:   libgbm
+
+%description libgbm
+libgbm runtime libraries
 
 %prep
-%setup -q -n Mesa-%{version} -b1
+%setup -q -n %{name}-%{version}/upstream
 
-# mesa-7.11-git-notimestamping.patch
+%if ! %{with X11}
+# eglplatform_no_x11.patch
 %patch0 -p1
-# fix-shm-roundtrip.patch
-%patch1 -p1
-# nosse4avx.patch
-%patch2 -p1
-# nativewidth.patch
-%patch3 -p1
-# >> setup
-# << setup
+%endif
 
 %build
-# >> build pre
+%if ! %{with X11}
+export CFLAGS=-DMESA_EGL_NO_X11_HEADERS
+%endif
 
-# << build pre
-
-%reconfigure --disable-static \
-    --with-x \
-    --enable-gallium-llvm \
-    --with-dri-drivers=swrast \
-    --with-state-trackers=egl \
-    --enable-glew=no \
-    --enable-glw=no \
-    --enable-glut=no \
-    --enable-gles1=yes \
-    --enable-gles2=yes \
-    --enable-egl=yes \
-    --enable-gallium-egl \
+%autogen --disable-static \
     --enable-osmesa=no \
+    --enable-gallium-egl \
+    --enable-gallium-llvm \
+    --enable-dri \
+    --with-dri-drivers=swrast \
     --with-gallium-drivers=swrast \
-    --with-egl-platforms=x11,fbdev,wayland \
+%if %{with X11}
+    --with-egl-platforms=x11,fbdev,wayland,drm \
+    --with-x \
     --enable-glx-tls \
     --enable-glx=yes \
-    --enable-dri
+%else
+    --enable-gbm \
+    --enable-gallium-gbm \
+    --with-egl-platforms=fbdev,wayland,drm \
+    --disable-glx \
+    --disable-xlib-glx \
+    --disable-xa \
+    --disable-xvmc \
+    --disable-vdpau \
+%endif
+    --enable-egl=yes \
+    --enable-gles1=yes \
+    --enable-gles2=yes
 
-make %{?jobs:-j%jobs}
-
-# >> build post
-# << build post
+make %{?jobs:-j%jobs} V=1
 
 %install
 rm -rf %{buildroot}
-# >> install pre
-# << install pre
 %make_install
 
-# >> install post
-
 # strip out undesirable headers
+rm -f $RPM_BUILD_ROOT/etc/drirc
 pushd $RPM_BUILD_ROOT%{_includedir}/GL
 rm [a-fh-np-wyz]*.h
 rm osmesa.h
 popd
-
-#remove egl_glx.so, which is broken
-#pushd $RPM_BUILD_ROOT%{_libdir}
-#rm -f egl/egl_glx.so
-#popd
-
-# << install post
-
 
 %post libglapi -p /sbin/ldconfig
 
@@ -310,9 +331,11 @@ popd
 
 %postun libEGL-compat -p /sbin/ldconfig
 
+%if %{with X11}
 %post libGL -p /sbin/ldconfig
 
 %postun libGL -p /sbin/ldconfig
+%endif
 
 %post dri-swrast-driver -p /sbin/ldconfig
 
@@ -322,82 +345,71 @@ popd
 
 %postun libwayland-egl -p /sbin/ldconfig
 
+%post libgbm -p /sbin/ldconfig
+
+%postun libgbm -p /sbin/ldconfig
+
 %files
 %defattr(-,root,root,-)
-# >> files
 %{_libdir}/egl/egl_gallium.so
-# << files
 
 %files libglapi
 %defattr(-,root,root,-)
-# >> files libglapi
 %{_libdir}/libglapi.so.0
 %{_libdir}/libglapi.so.0.*
-# << files libglapi
 
 %files libGLESv1
 %defattr(-,root,root,-)
-# >> files libGLESv1
 %{_libdir}/libGLESv1_CM.so.1
 %{_libdir}/libGLESv1_CM.so.1.1.0
-# << files libGLESv1
 
 %files libGLESv2
 %defattr(-,root,root,-)
-# >> files libGLESv2
 %{_libdir}/libGLESv2.so.2
 %{_libdir}/libGLESv2.so.2.0.0
-# << files libGLESv2
 
 %files libGLESv2-compat
 %defattr(-,root,root,-)
-# >> files libGLESv2-compat
 %{_libdir}/libGLESv2.so
-# << files libGLESv2-compat
+
+%files libGLES3-devel
+%defattr(-,root,root,-)
+%{_includedir}/GLES3/gl3.h
+%{_includedir}/GLES3/gl3ext.h
+%{_includedir}/GLES3/gl3platform.h
 
 %files libEGL
 %defattr(-,root,root,-)
-# >> files libEGL
 %{_libdir}/libEGL.so.1
 %{_libdir}/libEGL.so.1.0.0
-# << files libEGL
 
 %files libEGL-compat
 %defattr(-,root,root,-)
-# >> files libEGL-compat
 %{_libdir}/libEGL.so
-# << files libEGL-compat
 
 %files libglapi-devel
 %defattr(-,root,root,-)
-# >> files libglapi-devel
 %{_libdir}/libglapi.so
-# << files libglapi-devel
 
 %files libGLESv1-devel
 %defattr(-,root,root,-)
-# >> files libGLESv1-devel
 %{_libdir}/libGLESv1_CM.so
 %{_includedir}/GLES/egl.h
 %{_includedir}/GLES/gl.h
 %{_includedir}/GLES/glext.h
 %{_includedir}/GLES/glplatform.h
 %{_libdir}/pkgconfig/glesv1_cm.pc
-# << files libGLESv1-devel
 
 %files libGLESv2-devel
 %defattr(-,root,root,-)
-# >> files libGLESv2-devel
 %{_libdir}/libGLESv2.so
 %{_includedir}/GLES2/gl2.h
 %{_includedir}/GLES2/gl2ext.h
 %{_includedir}/GLES2/gl2platform.h
 %{_libdir}/pkgconfig/glesv2.pc
-# << files libGLESv2-devel
 
 %files libEGL-devel
 %defattr(-,root,root,-)
-# >> files libEGL-devel
 %{_libdir}/libEGL.so
 %dir %{_includedir}/EGL
 %{_includedir}/EGL/egl.h
@@ -407,17 +419,15 @@ popd
 %dir %{_includedir}/KHR
 %{_includedir}/KHR/khrplatform.h
 %{_libdir}/pkgconfig/egl.pc
-# << files libEGL-devel
 
+%if %{with X11}
 %files libGL
 %defattr(-,root,root,-)
-# >> files libGL
 %{_libdir}/libGL.so.*
-# << files libGL
+%endif
 
 %files libGL-devel
 %defattr(-,root,root,-)
-# >> files libGL-devel
 %{_includedir}/GL/gl.h
 %{_includedir}/GL/gl_mangle.h
 %{_includedir}/GL/glext.h
@@ -426,34 +436,39 @@ popd
 %{_includedir}/GL/glxext.h
 %dir %{_includedir}/GL/internal
 %{_includedir}/GL/internal/dri_interface.h
+%if %{with X11}
 %{_libdir}/libGL.so
+%endif
 %{_libdir}/pkgconfig/gl.pc
-# << files libGL-devel
 
 %files dri-drivers-devel
 %defattr(-,root,root,-)
-# >> files dri-drivers-devel
-%{_libdir}/libdricore%{version}.so
+#%{_libdir}/libdricore%{version}.so
 %{_libdir}/pkgconfig/dri.pc
-# << files dri-drivers-devel
 
 %files dri-swrast-driver
 %defattr(-,root,root,-)
-# >> files dri-swrast-driver
-%{_libdir}/libdricore%{version}.so.*
+#%{_libdir}/libdricore%{version}.so.*
 %{_libdir}/dri/swrast_dri.so
-# << files dri-swrast-driver
+%{_libdir}/gallium-pipe/pipe_swrast*
 
 %files libwayland-egl-devel
 %defattr(-,root,root,-)
-# >> files libwayland-egl-devel
 %{_libdir}/libwayland-egl.so
 %{_libdir}/pkgconfig/wayland-egl.pc
-# << files libwayland-egl-devel
 
 %files libwayland-egl
 %defattr(-,root,root,-)
-# >> files libwayland-egl
 %{_libdir}/libwayland-egl.so.1
 %{_libdir}/libwayland-egl.so.1.*
-# << files libwayland-egl
+
+%files libgbm
+%defattr(-,root,root,-)
+%{_libdir}/libgbm.so.*
+%{_libdir}/gbm/gbm_gallium_drm.so
+
+%files libgbm-devel
+%defattr(-,root,root,-)
+%{_includedir}/gbm.h
+%{_libdir}/libgbm.so
+%{_libdir}/pkgconfig/gbm.pc

@@ -1,6 +1,6 @@
 Name: mesa-llvmpipe
 Summary: Mesa graphics libraries built for LLVMpipe
-Version: 9.0.3
+Version: 10.0.4
 Release: 0
 Group: System/Libraries
 License: MIT
@@ -9,10 +9,8 @@ Sources:
     - ftp://ftp.freedesktop.org/pub/mesa/%{version}/MesaLib-%{version}.tar.bz2
     - mesa-llvmpipe-rpmlintrc
 Patches:
-    - mesa-7.11-git-notimestamping.patch
-    - fix-shm-roundtrip.patch
+    - mesa-9.2-git-notimestamping.patch
     - nosse4avx.patch
-    - nativewidth.patch
 SetupOptions: "-q -n Mesa-%{version} -b1"
 
 Description: |
@@ -20,14 +18,15 @@ Description: |
     a system for rendering interactive 3D graphics.
 PkgBR:
     - pkgconfig autoconf automake
-    - expat-devel >= 2.0
     - python
     - libxml2-python
     - bison
     - flex
+    - gettext
     - makedepend
     - llvm-devel
 PkgConfigBR:
+    - expat >= 2.0
     - glproto
     - dri2proto >= 1.1
     - xproto
@@ -138,6 +137,15 @@ SubPackages:
       Obsoletes:
           - mesa-llvmpipe-libGLESv2-compat
 
+    - Name: libGLES3-devel
+      Summary: Mesa libGLES3 development package
+      Group: Development/Libraries
+      Description: Mesa libGLES3 development packages
+      Provides:
+          - libGLES3-devel
+      Requires:
+          - mesa-llvmpipe-libGLES3 = %{version}-%{release}
+
     - Name: libEGL-devel
       Summary: Mesa libEGL development package
       Group: Development/Libraries
@@ -191,4 +199,3 @@ SubPackages:
       Summary: Mesa libwayland-egl runtime library
       Group: System/Libraries
       Description: Mesa libwayland-egl runtime libraries
-
