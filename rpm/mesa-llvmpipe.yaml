@@ -25,7 +25,6 @@ PkgBR:
     - gettext
     - makedepend
     - llvm-devel
-    - wayland-devel
 PkgConfigBR:
     - expat >= 2.0
     - glproto
