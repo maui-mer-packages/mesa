@@ -45,6 +45,7 @@ BuildRequires:  libxml2-python
 BuildRequires:  bison
 BuildRequires:  flex
 BuildRequires:  llvm-devel
+BuildRequires:  wayland-devel
 BuildRequires:  gettext
 
 %description
